@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Flight Progress Strip Manager</title>
+    <style>
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            .fps-container {
+                page-break-after: always;
+                margin: 0;
+                border: 2px solid #000;
+            }
+            body {
+                background-color: white;
+            }
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: #fff;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .fps-list {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .fps-container {
+            background-color: #ffeb3b;
+            border: 2px solid #000;
+            padding: 10px;
+            width: 600px;
+            height: 80px;
+            display: grid;
+            grid-template-columns: 0.8fr 1.2fr 1fr 1fr 1fr;
+            gap: 2px;
+            position: relative;
+        }
+
+        .fps-section {
+            border: 1px solid #666;
+            padding: 4px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            background-color: #fff;
+        }
+
+        .fps-label {
+            font-size: 10px;
+            color: #666;
+            margin-bottom: 2px;
+        }
+
+        .fps-value {
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .fps-time {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .fps-route {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .fps-arrow {
+            font-size: 16px;
+            color: #333;
+        }
+
+        .editable {
+            border: none;
+            background: transparent;
+            width: 100%;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .editable:focus {
+            outline: 1px solid #2196F3;
+            background-color: #e3f2fd;
+        }
+
+        .strip-controls {
+            position: absolute;
+            right: -40px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .button {
+            padding: 8px 16px;
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .button:hover {
+            background-color: #1976D2;
+        }
+
+        .delete-button {
+            background-color: #f44336;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            width: 30px;
+            height: 30px;
+            cursor: pointer;
+        }
+
+        .delete-button:hover {
+            background-color: #d32f2f;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls no-print">
+        <button onclick="addNewStrip()" class="button">新規運航票追加</button>
+        <button onclick="window.print()" class="button">印刷</button>
+        <button onclick="saveStrips()" class="button">保存</button>
+        <button onclick="loadStrips()" class="button">読み込み</button>
+    </div>
+    
+    <div id="fps-list" class="fps-list"></div>
+
+    <template id="fps-template">
+        <div class="fps-container">
+            <div class="fps-section">
+                <div>
+                    <div class="fps-label">便名</div>
+                    <input type="text" class="editable fps-value" name="flightNumber" />
+                </div>
+                <div>
+                    <div class="fps-label">機種</div>
+                    <input type="text" class="editable fps-value" name="aircraftType" />
+                </div>
+            </div>
+            <div class="fps-section">
+                <div class="fps-label">経路</div>
+                <div class="fps-route fps-value">
+                    <input type="text" class="editable" name="departure" style="width: 45px; text-align: center;" />
+                    <span class="fps-arrow">→</span>
+                    <input type="text" class="editable" name="arrival" style="width: 45px; text-align: center;" />
+                </div>
+            </div>
+            <div class="fps-section">
+                <div class="fps-label">予定時刻</div>
+                <div class="fps-time">
+                    <input type="text" class="editable fps-value" name="scheduledTime" style="width: 45px; text-align: center;" />
+                </div>
+            </div>
+            <div class="fps-section">
+                <div class="fps-label">実施時刻</div>
+                <div class="fps-time">
+                    <input type="text" class="editable fps-value" name="actualTime" style="width: 45px; text-align: center;" />
+                </div>
+            </div>
+            <div class="fps-section">
+                <div class="fps-label">備考</div>
+                <input type="text" class="editable fps-value" name="remarks" placeholder="備考入力" />
+            </div>
+            <div class="strip-controls no-print">
+                <button class="delete-button" onclick="deleteStrip(this)">×</button>
+            </div>
+        </div>
+    </template>
+
+    <script>
+        // 運航票の追加
+        function addNewStrip() {
+            const template = document.getElementById('fps-template');
+            const clone = template.content.cloneNode(true);
+            document.getElementById('fps-list').appendChild(clone);
+            
+            // 新しく追加された要素にイベントリスナーを設定
+            const newStrip = document.getElementById('fps-list').lastElementChild;
+            setupStripValidation(newStrip);
+        }
+
+        // 運航票の削除
+        function deleteStrip(button) {
+            if (confirm('この運航票を削除してもよろしいですか？')) {
+                button.closest('.fps-container').remove();
+            }
+        }
+
+        // 時刻入力のバリデーション設定
+        function setupStripValidation(strip) {
+            strip.querySelectorAll('.fps-time input').forEach(input => {
+                input.addEventListener('input', (e) => {
+                    let value = e.target.value.replace(/[^\d]/g, '');
+                    if (value.length > 4) value = value.slice(0, 4);
+                    
+                    if (value.length === 4) {
+                        const hours = parseInt(value.slice(0, 2));
+                        const minutes = parseInt(value.slice(2, 4));
+                        if (hours >= 24 || minutes >= 60) {
+                            e.target.style.color = 'red';
+                        } else {
+                            e.target.style.color = 'black';
+                        }
+                    }
+                    
+                    e.target.value = value;
+                });
+            });
+        }
+
+        // 運航票データの保存
+        function saveStrips() {
+            const strips = Array.from(document.querySelectorAll('.fps-container')).map(strip => {
+                const data = {};
+                strip.querySelectorAll('.editable').forEach(input => {
+                    data[input.name] = input.value;
+                });
+                return data;
+            });
+            
+            localStorage.setItem('flightStrips', JSON.stringify(strips));
+            alert('保存しました');
+        }
+
+        // 運航票データの読み込み
+        function loadStrips() {
+            const strips = JSON.parse(localStorage.getItem('flightStrips') || '[]');
+            document.getElementById('fps-list').innerHTML = '';
+            
+            strips.forEach(stripData => {
+                addNewStrip();
+                const strip = document.querySelector('.fps-container:last-child');
+                Object.entries(stripData).forEach(([name, value]) => {
+                    const input = strip.querySelector(`[name="${name}"]`);
+                    if (input) input.value = value;
+                });
+            });
+        }
+
+        // 初期運航票の作成
+        addNewStrip();
+    </script>
+</body>
+</html>

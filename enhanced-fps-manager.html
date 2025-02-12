@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flight Progress Strip Manager</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        /* 検索バーのスタイル */
+        .search-bar {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .search-input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .filter-select {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            background-color: white;
+        }
+
+        /* チェックボックス列のスタイル */
+        .select-column {
+            width: 30px;
+            text-align: center;
+        }
+
+        /* 基本スタイルを継承し、改善を加える */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+        }
+
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 0 5px;
+            transition: background-color 0.3s ease;
+            display: inline-flex; /* Flexbox を使用 */
+            align-items: center; /* 垂直方向に中央揃え */
+            justify-content: center; /* 水平方向に中央揃え */
+
+        }
+
+        .button:hover {
+            background-color: #3e8e41;
+        }
+
+        .button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        .delete-button {
+            background-color: #f44336;
+            padding: 6px 12px;
+        }
+
+        .duplicate-button {
+            background-color: #2196F3;
+            padding: 6px 12px;
+        }
+
+        /* テーブルスタイルの改善 */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 12px 8px;
+            text-align: left;
+            vertical-align: middle;
+        }
+
+        th {
+            background-color: #f8f9fa;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+
+        /* 入力フィールドのスタイル改善 */
+        input[type="text"],
+        textarea {
+            width: calc(100% - 16px);
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        input[type="text"]:focus,
+        textarea:focus {
+            border-color: #4CAF50;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+        }
+
+        .error {
+            border-color: #f44336 !important;
+            background-color: #ffebee;
+        }
+
+        /* アラートメッセージのスタイル */
+        .alert {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 4px;
+            color: white;
+            z-index: 1000;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .alert-success {
+            background-color: #4CAF50;
+        }
+
+        .alert-error {
+            background-color: #f44336;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+            }
+
+            to {
+                transform: translateX(0);
+            }
+        }
+
+        /* ドラッグ&ドロップのスタイル改善 */
+        .sortable-ghost {
+            opacity: 0.5;
+            background-color: #e8f5e9 !important;
+        }
+
+        .drag-handle {
+            cursor: move;
+            color: #999;
+            user-select: none;
+        }
+
+        /* CSV入力の非表示 */
+        .hidden-input {
+            display: none;
+        }
+
+        /* 印刷用スタイル */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+
+            body {
+                background-color: white;
+            }
+
+            table {
+                page-break-inside: avoid;
+            }
+
+            th,
+            td {
+                border: 1px solid black;
+            }
+
+            .container {
+                box-shadow: none;
+                padding: 0;
+            }
+        }
+
+        /* レスポンシブデザイン */
+        @media (max-width: 768px) {
+            .controls {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+
+            .button {
+                flex: 1;
+                min-width: 120px;
+            }
+
+            th,
+            td {
+                padding: 8px 4px;
+                font-size: 14px;
+            }
+        }
+
+        /* ステータスに応じた行の背景色 */
+        tr[data-status="departure"] {
+            background-color: #fff3e0;
+        }
+        
+        tr[data-status="enroute"] {
+            background-color: #e8f5e9;
+        }
+        
+        tr[data-status="arrived"] {
+            background-color: #e3f2fd;
+        }
+
+        /* スタイル定義に追加 */
+        .config-panel {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+
+        .config-panel.hidden {
+            display: none;
+        }
+
+        .config-item {
+            margin-bottom: 15px;
+        }
+
+        .config-input {
+            width: 100%;
+            margin-top: 5px;
+        }
+
+        .config-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>運航票管理システム</h1>
+        <div class="search-bar no-print">
+            <input type="text" id="search-input" placeholder="便名、空港コードで検索..." class="search-input">
+            <select id="filter-select" class="filter-select">
+                <option value="all">すべて表示</option>
+                <option value="departure">出発待ち</option>
+                <option value="enroute">運航中</option>
+                <option value="arrived">到着済み</option>
+            </select>
+        </div>
+        <div class="controls no-print">
+            <button class="button" id="add-strip">
+                <span class="material-icons">add</span> 新規追加
+            </button>
+            <button class="button" id="bulk-delete" disabled>
+                <span class="material-icons">delete</span> 一括削除
+            </button>
+            <button class="button" id="save-strips">
+                <span class="material-icons">save</span> 保存
+            </button>
+            <button class="button" id="load-strips">
+                <span class="material-icons">folder_open</span> 読込
+            </button>
+            <button class="button" id="print-strips">
+                <span class="material-icons">print</span> 印刷
+            </button>
+            <button class="button" id="export-csv">
+                <span class="material-icons">download</span> CSVエクスポート
+            </button>
+            <input type="file" id="import-csv" class="hidden-input" accept=".csv">
+            <button class="button" id="import-csv-button">
+                <span class="material-icons">upload</span> CSVインポート
+            </button>
+            <button class="button" id="config-button">
+                <span class="material-icons">settings</span> 設定
+            </button>
+        </div>
+        <div id="config-panel" class="config-panel hidden">
+            <h2>設定</h2>
+            <div class="config-item">
+                <label>
+                    <input type="checkbox" id="enable-webhook">
+                    WebHook送受信を有効化
+                </label>
+                <input type="text" id="webhook-url" placeholder="WebHook URL" class="config-input">
+            </div>
+            <div class="config-item">
+                <label>
+                    <input type="checkbox" id="enable-rss">
+                    RSS送信を有効化
+                </label>
+                <input type="text" id="rss-url" placeholder="RSS フィード URL" class="config-input">
+            </div>
+            <div class="config-actions">
+                <button class="button" id="save-config">保存</button>
+                <button class="button" id="cancel-config">キャンセル</button>
+            </div>
+        </div>
+        <table id="fps-table">
+            <thead>
+                <tr>
+                    <th class="no-print" width="30">&nbsp;</th>
+                    <th width="100">便名</th>
+                    <th width="80">機種</th>
+                    <th width="80">出発地</th>
+                    <th width="80">到着地</th>
+                    <th width="100">予定時刻</th>
+                    <th width="100">実施時刻</th>
+                    <th>備考</th>
+                    <th class="no-print" width="120">操作</th>
+                </tr>
+            </thead>
+            <tbody id="fps-body"></tbody>
+        </table>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <script>
+        // FPSManager モジュール
+        const FPSManager = (function () {
+            // 定数定義
+            const STORAGE_KEY = 'flightStrips';
+            const TIME_PATTERN = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+            const FLIGHT_NUMBER_PATTERN = /^[A-Z]{2}\d{1,4}$/;
+            const CONFIG_KEY = 'fpsConfig';
+            const DEFAULT_CONFIG = {
+                webhookUrl: '',
+                rssUrl: '',
+                enableWebhook: false,
+                enableRss: false
+            };
+
+            // 空港コードマスターデータ
+            const airportCodes = {
+                "HND": "東京/羽田", "NRT": "東京/成田", "KIX": "大阪/関西",
+                "ITM": "大阪/伊丹", "NGO": "名古屋/中部", "FUK": "福岡",
+                "CTS": "札幌/新千歳", "OKA": "沖縄/那覇"
+            };
+
+            // DOM要素
+            const elements = {
+                table: document.getElementById('fps-table'),
+                tableBody: document.getElementById('fps-body'),
+                addButton: document.getElementById('add-strip'),
+                printButton: document.getElementById('print-strips'),
+                saveButton: document.getElementById('save-strips'),
+                loadButton: document.getElementById('load-strips'),
+                exportButton: document.getElementById('export-csv'),
+                importButton: document.getElementById('import-csv-button'),
+                importInput: document.getElementById('import-csv'),
+                searchInput: document.getElementById('search-input'), // 検索バー
+                filterSelect: document.getElementById('filter-select'), // フィルタ
+                bulkDeleteButton: document.getElementById('bulk-delete'), // 一括削除ボタン
+                configButton: document.getElementById('config-button'),
+                configPanel: document.getElementById('config-panel')
+            };
+
+            // 初期化
+            function init() {
+                setupEventListeners();
+                loadStrips();
+                initializeSortable();
+                setupConfigPanel();
+            }
+
+            // イベントリスナーの設定
+            function setupEventListeners() {
+                elements.addButton.addEventListener('click', addStrip);
+                elements.printButton.addEventListener('click', () => window.print());
+                elements.saveButton.addEventListener('click', saveStrips);
+                elements.loadButton.addEventListener('click', loadStrips);
+                elements.exportButton.addEventListener('click', exportToCsv);
+                elements.importButton.addEventListener('click', () => elements.importInput.click());
+                elements.importInput.addEventListener('change', handleCsvImport);
+
+                // 検索機能
+                elements.searchInput.addEventListener('input', filterStrips);
+                // フィルター機能
+                elements.filterSelect.addEventListener('change', filterStrips);
+                // 一括削除
+                elements.bulkDeleteButton.addEventListener('click', bulkDelete);
+            }
+
+            // Sortable.jsの初期化
+            function initializeSortable() {
+                new Sortable(elements.tableBody, {
+                    animation: 150,
+                    handle: '.drag-handle',
+                    ghostClass: 'sortable-ghost',
+                    onEnd: saveStrips
+                });
+            }
+
+            // 運航票の行を作成
+            function createStripRow(data = {}) {
+                const row = document.createElement('tr');
+                // data.status に基づいてステータスを決定
+                let status = data.status || 'departure'; // デフォルトは 'departure'
+                if (!data.status) {
+                  if (data.actualTime) {
+                    status = 'arrived';
+                  } else if (data.scheduledTime) {
+                    status = 'enroute'
+                  }
+                }
+
+                row.dataset.status = status; // data-status 属性を設定
+                row.innerHTML = `
+                    <td class="no-print drag-handle">≡</td>
+                    <td><input type="text" class="editable flight-number" 
+                        placeholder="例: JL123" value="${data.flightNumber || ''}" 
+                        pattern="[A-Z]{2}\\d{1,4}"></td>
+                    <td><input type="text" class="editable aircraft-type" 
+                        placeholder="例: B777" value="${data.aircraftType || ''}"></td>
+                    <td><input type="text" class="editable airport-input departure" 
+                        placeholder="例: HND" value="${data.departure || ''}"
+                        maxlength="3"></td>
+                    <td><input type="text" class="editable airport-input arrival" 
+                        placeholder="例: KIX" value="${data.arrival || ''}"
+                        maxlength="3"></td>
+                    <td><input type="text" class="editable time-input scheduled-time" 
+                        placeholder="例: 12:00" value="${data.scheduledTime || ''}"></td>
+                    <td><input type="text" class="editable time-input actual-time" 
+                        placeholder="例: 12:05" value="${data.actualTime || ''}"></td>
+                    <td><textarea class="editable remarks" 
+                        placeholder="備考を入力">${data.remarks || ''}</textarea></td>
+                    <td class="no-print">
+                        <button class="button duplicate-button" title="複製">複製</button>
+                        <button class="button delete-button" title="削除">削除</button>
+                    </td>
+                `;
+                setupRowListeners(row);
+                return row;
+            }
+
+            // 行のイベントリスナー設定
+            function setupRowListeners(row) {
+                // 時刻入力のフォーマット
+                row.querySelectorAll('.time-input').forEach(input => {
+                    input.addEventListener('input', formatTimeInput);
+                    input.addEventListener('blur', validateTimeInput);
+                });
+
+                // 空港コードの自動補完
+                row.querySelectorAll('.airport-input').forEach(input => {
+                    input.addEventListener('input', e => {
+                        const value = e.target.value.toUpperCase();
+                        e.target.value = value;
+                        validateAirportCode(input, value);
+                    });
+                });
+
+                // 便名のバリデーション
+                row.querySelector('.flight-number').addEventListener('input', validateFlightNumber);
+
+                // 変更を保存に反映
+                row.querySelectorAll('.editable').forEach(el => {
+                    el.addEventListener('input', saveStrips);
+                });
+
+                // 削除ボタン
+                row.querySelector('.delete-button').addEventListener('click', () => { 
+                    if (confirm('この運航票を削除しますか？')) {
+                        row.remove();
+                        saveStrips();
+                        showNotification('運航票を削除しました', 'success');
+                    }
+                });
+
+                // 複製ボタン
+                row.querySelector('.duplicate-button').addEventListener('click', () => {
+                    const newRow = createStripRow(getRowData(row));
+                    row.parentNode.insertBefore(newRow, row.nextSibling);
+                    saveStrips();
+                    showNotification('運航票を複製しました', 'success');
+                });
+            }
+
+            // 時刻入力のフォーマットとバリデーション
+            function formatTimeInput(event) {
+                let value = event.target.value.replace(/[^0-9]/g, '');
+                if (value.length > 4) value = value.slice(0, 4);
+
+                if (value.length > 2) {
+                    value = value.slice(0, 2) + ':' + value.slice(2);
+                }
+
+                event.target.value = value;
+            }
+
+            function validateTimeInput(event) {
+                const input = event.target;
+                const value = input.value;
+                const isValid = TIME_PATTERN.test(value);
+
+                if (value && !isValid) {
+                    input.classList.add('error');
+                    showNotification('時刻は24時間形式で入力してください (例: 13:30)', 'error');
+                    return false;
+                }
+
+                if (value) {
+                    const [hours, minutes] = value.split(':');
+                    if (parseInt(hours) >= 24 || parseInt(minutes) >= 60) {
+                        input.classList.add('error');
+                        showNotification('無効な時刻です', 'error');
+                        return false;
+                    }
+                }
+
+                input.classList.remove('error');
+                updateRowStatus(input);
+                return true;
+            }
+
+            // 空港コードのバリデーション
+            function validateAirportCode(input, code) {
+                if (code && !airportCodes[code]) {
+                    input.classList.add('error');
+                    showNotification(`空港コード ${code} が見つかりません`, 'error');
+                } else {
+                    input.classList.remove('error');
+                }
+            }
+
+            // 便名のバリデーション
+            function validateFlightNumber(event) {
+                const input = event.target;
+                const value = input.value.toUpperCase();
+                input.value = value;
+
+                if (value && !FLIGHT_NUMBER_PATTERN.test(value)) {
+                    input.classList.add('error');
+                    showNotification('便名は航空会社コード(2文字)+便名(1-4桁)で入力してください。例: JL123', 'error');
+                    return false;
+                }
+
+                input.classList.remove('error');
+                return true;
+            }
+
+            // ステータス更新関数
+            function updateRowStatus(input) {
+                const row = input.closest('tr');
+                const scheduledTime = row.querySelector('.scheduled-time').value;
+                const actualTime = row.querySelector('.actual-time').value;
+
+                if (actualTime) {
+                    row.dataset.status = 'arrived';       // 実施時刻が入力されたらステータスを arrived に変更
+                } else if (scheduledTime) {
+                    row.dataset.status = 'enroute';       // 予定時刻が入力されたらステータスを enroute に変更
+                } else {
+                    row.dataset.status = 'departure';
+                }
+                saveStrips();
+            }
+
+            // 行からデータを取得
+            function getRowData(row) {
+                return {
+                    flightNumber: row.querySelector('.flight-number').value,
+                    aircraftType: row.querySelector('.aircraft-type').value,
+                    departure: row.querySelector('.departure').value,
+                    arrival: row.querySelector('.arrival').value,
+                    scheduledTime: row.querySelector('.scheduled-time').value,
+                    actualTime: row.querySelector('.actual-time').value,
+                    remarks: row.querySelector('.remarks').value,
+                    status: row.dataset.status
+                };
+            }
+
+            // 運航票を追加
+            function addStrip() {
+                const newRow = createStripRow();
+                elements.tableBody.appendChild(newRow);
+            }
+
+            // 運航票を保存
+            function saveStrips() {
+                const strips = Array.from(elements.tableBody.children).map(getRowData);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(strips));
+                
+                // WebHookとRSS送信
+                strips.forEach(strip => {
+                    sendWebhook(strip);
+                    sendRss(strip);
+                });
+                
+                showNotification('運航票を保存しました', 'success');
+            }
+
+            // 運航票を読み込む
+            function loadStrips() {
+                const savedStrips = localStorage.getItem(STORAGE_KEY);
+                if (savedStrips) {
+                    elements.tableBody.innerHTML = ''; // 現在のテーブルをクリア
+                    const strips = JSON.parse(savedStrips);
+                    strips.forEach(stripData => {
+                        const row = createStripRow(stripData);
+                        elements.tableBody.appendChild(row);
+                    });
+                }
+                filterStrips(); // 読み込み後フィルタリング
+            }
+
+            // 通知を表示
+            function showNotification(message, type) {
+                const alertDiv = document.createElement('div');
+                alertDiv.classList.add('alert', `alert-${type}`);
+                alertDiv.textContent = message;
+                document.body.appendChild(alertDiv);
+
+                setTimeout(() => {
+                    alertDiv.remove();
+                }, 3000);
+            }
+
+            // CSVエクスポート
+            function exportToCsv() {
+                const strips = Array.from(elements.tableBody.children).map(getRowData);
+                
+                // BOMを追加してUTF-8で正しく認識されるようにする
+                const BOM = '\uFEFF';
+                let csvContent = BOM;
+
+                // ヘッダー行
+                csvContent += "便名,機種,出発地,到着地,予定時刻,実施時刻,備考,ステータス\r\n";
+
+                // データ行
+                strips.forEach(strip => {
+                    const row = [
+                        strip.flightNumber,
+                        strip.aircraftType,
+                        strip.departure,
+                        strip.arrival,
+                        strip.scheduledTime,
+                        strip.actualTime,
+                        `"${(strip.remarks || '').replace(/"/g, '""')}"`, // 備考欄のエスケープ処理
+                        strip.status
+                    ].join(',');
+                    csvContent += row + "\r\n";
+                });
+
+                // Blobを使用してUTF-8でエンコード
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                
+                const link = document.createElement("a");
+                link.setAttribute("href", url);
+                link.setAttribute("download", "flight_strips.csv");
+                document.body.appendChild(link);
+                link.click();
+                
+                // クリーンアップ
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+
+                showNotification('CSVファイルにエクスポートしました', 'success');
+            }
+
+            // CSVインポート処理
+            function handleCsvImport(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const contents = e.target.result;
+                    const rows = contents.split('\n');
+
+                    if (rows.length === 0) {
+                        showNotification('CSVファイルが空です', 'error');
+                        return;
+                    }
+
+                    // ヘッダーの検証
+                    const header = rows[0].split(',');
+                    const expectedHeader = ["便名", "機種", "出発地", "到着地", "予定時刻", "実施時刻", "備考", "ステータス"];
+                    if (header.length !== expectedHeader.length || !header.every((value, index) => value === expectedHeader[index])) {
+                         showNotification('CSVファイルのヘッダーが不正です', 'error');
+                         return;
+                    }
+
+                    elements.tableBody.innerHTML = ''; // テーブルをクリア
+
+                    for (let i = 1; i < rows.length; i++) {
+                        const rowData = rows[i].split(',');
+                        if (rowData.length < 7) continue; // データ不足の行はスキップ
+
+                        // 備考欄のダブルクォートを適切に処理
+                        let remarks = rowData[6] || '';
+                        if (remarks.startsWith('"') && remarks.endsWith('"')) {
+                            remarks = remarks.slice(1, -1).replace(/""/g, '"');
+                        }
+
+                        const stripData = {
+                            flightNumber: rowData[0],
+                            aircraftType: rowData[1],
+                            departure: rowData[2],
+                            arrival: rowData[3],
+                            scheduledTime: rowData[4],
+                            actualTime: rowData[5],
+                            remarks: remarks,
+                            status: rowData.length > 7 ? rowData[7] : 'departure' // ステータスがあれば使用、なければデフォルト値
+                        };
+
+                        const newRow = createStripRow(stripData);
+                        elements.tableBody.appendChild(newRow);
+                    }
+
+                    showNotification('CSVファイルからインポートしました', 'success');
+                    filterStrips();
+                };
+                reader.readAsText(file);
+            }
+
+            // 検索とフィルタリング
+            function filterStrips() {
+                const searchText = elements.searchInput.value.toLowerCase();
+                const filterValue = elements.filterSelect.value;
+
+                Array.from(elements.tableBody.rows).forEach(row => {
+                    const flightNumber = (row.querySelector('.flight-number')?.value || '').toLowerCase();
+                    const departure = (row.querySelector('.departure')?.value || '').toLowerCase();
+                    const arrival = (row.querySelector('.arrival')?.value || '').toLowerCase();
+                    const status = row.dataset.status;
+
+                    const matchesSearch = flightNumber.includes(searchText) || departure.includes(searchText) || arrival.includes(searchText);
+                    const matchesFilter = filterValue === 'all' || status === filterValue;
+
+                    row.style.display = matchesSearch && matchesFilter ? '' : 'none';
+                });
+
+                // 検索/フィルター適用後に、少なくとも1つの行が表示されているか確認
+                checkBulkDeleteState();
+            }
+
+            // 一括削除ボタンの状態を更新する関数
+            function checkBulkDeleteState() {
+                const visibleRows = Array.from(elements.tableBody.rows).filter(row => row.style.display !== 'none');
+                elements.bulkDeleteButton.disabled = visibleRows.length === 0;
+            }
+
+            // 一括削除機能
+            function bulkDelete() {
+                if (confirm('表示されているすべての運航票を削除しますか？')) {
+                    Array.from(elements.tableBody.rows).forEach(row => {
+                        if (row.style.display !== 'none') {
+                            row.remove();
+                        }
+                    });
+                    saveStrips();
+                    showNotification('表示されていた運航票を一括削除しました', 'success');
+                    checkBulkDeleteState();
+                }
+            }
+
+            // 設定の読み込み
+            function loadConfig() {
+                const savedConfig = localStorage.getItem(CONFIG_KEY);
+                return savedConfig ? JSON.parse(savedConfig) : DEFAULT_CONFIG;
+            }
+
+            // 設定の保存
+            function saveConfig(config) {
+                localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+            }
+
+            // WebHook送信
+            async function sendWebhook(data) {
+                const config = loadConfig();
+                if (!config.enableWebhook || !config.webhookUrl) return;
+
+                try {
+                    const response = await fetch(config.webhookUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(data)
+                    });
+                    if (!response.ok) throw new Error('WebHook送信に失敗しました');
+                } catch (error) {
+                    showNotification(error.message, 'error');
+                }
+            }
+
+            // RSS送信
+            async function sendRss(data) {
+                const config = loadConfig();
+                if (!config.enableRss || !config.rssUrl) return;
+
+                try {
+                    const rssData = {
+                        title: '運航票更新',
+                        description: `${data.flightNumber} ${data.departure}-${data.arrival}`,
+                        items: [
+                            {
+                                title: `${data.flightNumber}便`,
+                                description: `出発: ${data.departure}, 到着: ${data.arrival}, 
+                                            時刻: ${data.scheduledTime}, 状態: ${data.status}`
+                            }
+                        ]
+                    };
+
+                    const response = await fetch(config.rssUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(rssData)
+                    });
+                    if (!response.ok) throw new Error('RSS送信に失敗しました');
+                } catch (error) {
+                    showNotification(error.message, 'error');
+                }
+            }
+
+            // 設定パネルの表示制御
+            function setupConfigPanel() {
+                const config = loadConfig();
+                
+                elements.configButton.addEventListener('click', () => {
+                    elements.configPanel.classList.remove('hidden');
+                    document.getElementById('enable-webhook').checked = config.enableWebhook;
+                    document.getElementById('webhook-url').value = config.webhookUrl;
+                    document.getElementById('enable-rss').checked = config.enableRss;
+                    document.getElementById('rss-url').value = config.rssUrl;
+                });
+
+                document.getElementById('save-config').addEventListener('click', () => {
+                    const newConfig = {
+                        enableWebhook: document.getElementById('enable-webhook').checked,
+                        webhookUrl: document.getElementById('webhook-url').value,
+                        enableRss: document.getElementById('enable-rss').checked,
+                        rssUrl: document.getElementById('rss-url').value
+                    };
+                    saveConfig(newConfig);
+                    elements.configPanel.classList.add('hidden');
+                    showNotification('設定を保存しました', 'success');
+                });
+
+                document.getElementById('cancel-config').addEventListener('click', () => {
+                    elements.configPanel.classList.add('hidden');
+                });
+            }
+
+            return {
+                init: init
+            };
+        })();
+
+        // 初期化
+        FPSManager.init();
+    </script>
+</body>
+</html>
